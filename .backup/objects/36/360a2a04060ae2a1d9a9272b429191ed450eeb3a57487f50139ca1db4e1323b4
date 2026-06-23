@@ -1,0 +1,110 @@
+package com.pydroid.app;
+
+import android.content.Context;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.AttributeSet;
+import android.util.TypedValue;
+import androidx.appcompat.widget.AppCompatEditText;
+
+/**
+ * CodeEditorView — 供 activity_editor.xml 引用的编辑器 View。
+ * 继承 AppCompatEditText，支持等宽字体、Tab 转空格、自动缩进。
+ */
+public class CodeEditorView extends AppCompatEditText {
+
+    private static final int TAB_SPACES = 4;
+    private boolean dirty = false;
+    private OnDirtyChangeListener dirtyListener;
+
+    public CodeEditorView(Context context) {
+        super(context);
+        init();
+    }
+
+    public CodeEditorView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+
+    public CodeEditorView(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init();
+    }
+
+    private void init() {
+        setHorizontallyScrolling(true);
+        setTypeface(android.graphics.Typeface.MONOSPACE);
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+
+        addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void afterTextChanged(Editable s) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!dirty) {
+                    dirty = true;
+                    if (dirtyListener != null) dirtyListener.onDirtyChanged(true);
+                }
+            }
+        });
+    }
+
+    @Override
+    protected void onTextChanged(CharSequence text, int start, int lengthBefore, int lengthAfter) {
+        super.onTextChanged(text, start, lengthBefore, lengthAfter);
+        // 自动缩进：回车后保持上一行缩进
+        if (lengthAfter == 1 && start > 0 && text.charAt(start) == '\n') {
+            Editable e = getText();
+            if (e == null) return;
+            int prevLineStart = start - 1;
+            while (prevLineStart > 0 && e.charAt(prevLineStart - 1) != '\n') prevLineStart--;
+            StringBuilder indent = new StringBuilder();
+            while (prevLineStart < start && (e.charAt(prevLineStart) == ' ' || e.charAt(prevLineStart) == '\t')) {
+                indent.append(' ');
+                prevLineStart++;
+            }
+            if (indent.length() > 0) e.insert(start + 1, indent.toString());
+        }
+    }
+
+    @Override
+    public boolean onKeyPreIme(int keyCode, android.view.KeyEvent event) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_TAB
+                && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < TAB_SPACES; i++) sb.append(' ');
+            getText().insert(getSelectionStart(), sb.toString());
+            return true;
+        }
+        return super.onKeyPreIme(keyCode, event);
+    }
+
+    public boolean isDirty() { return dirty; }
+    public void setDirty(boolean dirty) {
+        this.dirty = dirty;
+        if (dirtyListener != null) dirtyListener.onDirtyChanged(dirty);
+    }
+
+    /**
+     * 返回当前文本的行数（用于行号联动）。
+     */
+    public int getLineCount() {
+        Editable e = getText();
+        if (e == null || e.length() == 0) return 1;
+        int count = 1;
+        for (int i = 0; i < e.length(); i++) {
+            if (e.charAt(i) == '\n') count++;
+        }
+        return count;
+    }
+
+    public void setOnDirtyChangeListener(OnDirtyChangeListener listener) {
+        this.dirtyListener = listener;
+    }
+
+    public interface OnDirtyChangeListener {
+        void onDirtyChanged(boolean dirty);
+    }
+}

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.pydroidide">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <application
+        android:name="com.example.application.GlobalApplication"
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="PyDroid AI"
+        android:theme="@style/AppTheme"
+        android:requestLegacyExternalStorage="true">
+        
+        <!-- 主启动Activity (旧版ViewPager架构) -->
+        <activity
+            android:name="com.pydroid.app.MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        
+        <!-- 新版项目列表入口（也作为LAUNCHER备选） -->
+        <activity
+            android:name="com.example.pydroidide.MainActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize" />
+        
+        <!-- 旧版编辑器Activity -->
+        <activity
+            android:name="com.pydroid.app.EditorActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize" />
+        
+        <!-- 新版编辑器Activity (com.example.pydroidide包) -->
+        <activity
+            android:name="com.example.pydroidide.EditorActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize" />
+            
+        <activity
+            android:name="com.pydroid.app.AIAssistantActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+            
+        <activity
+            android:name="com.example.pydroidide.AIAssistantActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+            
+        <activity
+            android:name="com.pydroid.app.TerminalActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+            
+        <activity
+            android:name="com.example.application.GlobalApplication$CrashActivity"
+            android:exported="false"
+            android:process=":crash_report"
+            android:theme="@android:style/Theme_DeviceDefault" />
+            
+    </application>
+</manifest>

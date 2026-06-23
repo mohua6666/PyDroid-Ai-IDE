@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PyDroid AI</string>
+    <string name="tab_editor">编辑器</string>
+    <string name="tab_terminal">终端</string>
+    <string name="tab_ai">AI助手</string>
+    <string name="tab_files">文件</string>
+    <string name="run">运行</string>
+    <string name="save">保存</string>
+    <string name="undo">撤销</string>
+    <string name="redo">重做</string>
+    <string name="btn_ai_suggest">AI建议</string>
+    <string name="btn_fix_errors">修复错误</string>
+</resources>

@@ -1,0 +1,271 @@
+package com.pydroid.app;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.View;
+import android.widget.ImageButton;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import com.example.pydroidide.R;
+import com.example.pydroidide.editor.PythonSyntaxHighlighter;
+import com.example.pydroidide.python.PythonRunner;
+import com.example.pydroidide.utils.FileManager;
+import java.io.File;
+
+/**
+ * 编辑器 Activity — 代码编辑、运行、AI 辅助。
+ */
+public class EditorActivity extends AppCompatActivity {
+
+    private CodeEditorView codeEditor;
+    private LineNumberView lineNumbers;
+    private TextView tvFilename;
+    private TextView tvErrorContent;
+    private View errorPanel;
+    private ImageButton btnRun, btnSave, btnUndo, btnRedo;
+
+    private String projectPath;
+    private File currentFile;
+    private FileManager fileManager;
+    private PythonRunner pythonRunner;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_editor);
+
+        projectPath = getIntent().getStringExtra("project_path");
+        fileManager = new FileManager();
+        pythonRunner = new PythonRunner(this);
+
+        initViews();
+        loadProject();
+    }
+
+    private void initViews() {
+        codeEditor = findViewById(R.id.code_editor);
+        lineNumbers = findViewById(R.id.line_numbers);
+        tvFilename = findViewById(R.id.tv_filename);
+        tvErrorContent = findViewById(R.id.tv_error_content);
+        errorPanel = findViewById(R.id.error_panel);
+
+        btnRun = findViewById(R.id.btn_run);
+        btnSave = findViewById(R.id.btn_save);
+        btnUndo = findViewById(R.id.btn_undo);
+        btnRedo = findViewById(R.id.btn_redo);
+        ImageButton btnMenu = findViewById(R.id.btn_menu);
+
+        if (codeEditor == null) {
+            finish();
+            return;
+        }
+
+        // 关联编辑器与行号
+        if (lineNumbers != null && codeEditor != null) {
+            lineNumbers.setEditor(codeEditor);
+            // 当编辑器文本变化时更新行号
+            codeEditor.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(android.text.Editable s) {
+                    if (lineNumbers != null && codeEditor != null) {
+                        lineNumbers.setLineCount(codeEditor.getLineCount());
+                    }
+                }
+            });
+        }
+
+        // 运行按钮
+        if (btnRun != null) btnRun.setOnClickListener(v -> runCode());
+
+        // 保存按钮
+        if (btnSave != null) btnSave.setOnClickListener(v -> saveFile());
+
+        // 撤销/重做
+        if (btnUndo != null) btnUndo.setOnClickListener(v -> {
+            if (codeEditor != null && codeEditor.getText() != null) {
+                android.text.Editable e = codeEditor.getText();
+                // 简单撤销 — 需要自己维护 UndoManager
+                Toast.makeText(this, "撤销功能正在开发中...", Toast.LENGTH_SHORT).show();
+            }
+        });
+        if (btnRedo != null) btnRedo.setOnClickListener(v -> {
+            Toast.makeText(this, "重做功能正在开发中...", Toast.LENGTH_SHORT).show();
+        });
+
+        // 返回菜单
+        if (btnMenu != null) btnMenu.setOnClickListener(v -> finish());
+
+        // AI建议按钮
+        View btnAiSuggest = findViewById(R.id.btn_ai_suggest);
+        if (btnAiSuggest != null) {
+            btnAiSuggest.setOnClickListener(v -> {
+                String code = codeEditor.getText() != null ? codeEditor.getText().toString() : "";
+                if (TextUtils.isEmpty(code.trim())) {
+                    Toast.makeText(this, "请先编写代码", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                // 跳转到 AI 助手
+                Intent intent = new Intent(this, AIAssistantActivity.class);
+                intent.putExtra("code_snippet", code);
+                intent.putExtra("action", "suggest");
+                startActivity(intent);
+            });
+        }
+
+        // 修复错误按钮
+        View btnFix = findViewById(R.id.btn_fix_errors);
+        if (btnFix != null) {
+            btnFix.setOnClickListener(v -> {
+                String error = tvErrorContent.getText().toString();
+                String code = codeEditor.getText() != null ? codeEditor.getText().toString() : "";
+                Intent intent = new Intent(this, AIAssistantActivity.class);
+                intent.putExtra("code_snippet", code);
+                intent.putExtra("error_info", error);
+                intent.putExtra("action", "fix");
+                startActivity(intent);
+            });
+        }
+
+        // 终端按钮
+        View btnTerminal = findViewById(R.id.btn_terminal);
+        if (btnTerminal != null) {
+            btnTerminal.setOnClickListener(v -> {
+                Intent intent = new Intent(this, TerminalActivity.class);
+                if (currentFile != null) {
+                    intent.putExtra("script_path", currentFile.getAbsolutePath());
+                }
+                startActivity(intent);
+            });
+        }
+
+        // 语法高亮
+        if (codeEditor != null) {
+            codeEditor.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(android.text.Editable s) {
+                    PythonSyntaxHighlighter.highlight(codeEditor);
+                }
+            });
+        }
+    }
+
+    private void loadProject() {
+        if (projectPath != null) {
+            File projectDir = new File(projectPath);
+            if (projectDir.exists()) {
+                // 查找 main.py 或第一个 .py 文件
+                File[] pyFiles = projectDir.listFiles((d, n) -> n.endsWith(".py"));
+                if (pyFiles != null && pyFiles.length > 0) {
+                    currentFile = pyFiles[0];
+                } else {
+                    // 创建默认 main.py
+                    currentFile = new File(projectDir, "main.py");
+                    fileManager.createDefaultMainPy(currentFile);
+                }
+            }
+        }
+
+        if (currentFile == null) {
+            // 默认文件
+            currentFile = new File(getCacheDir(), "untitled.py");
+            fileManager.saveFile(currentFile, FileManager.DEFAULT_MAIN_PY);
+        }
+
+        String content = fileManager.readFile(currentFile);
+        if (codeEditor != null) {
+            codeEditor.setText(content);
+            codeEditor.setDirty(false);
+            PythonSyntaxHighlighter.highlight(codeEditor);
+        }
+        if (tvFilename != null) {
+            tvFilename.setText(currentFile.getName());
+        }
+        if (lineNumbers != null && codeEditor != null) {
+            lineNumbers.setLineCount(codeEditor.getLineCount());
+        }
+    }
+
+    private void saveFile() {
+        if (currentFile == null || codeEditor == null) return;
+        String content = codeEditor.getText() != null ? codeEditor.getText().toString() : "";
+        fileManager.saveFile(currentFile, content);
+        codeEditor.setDirty(false);
+        Toast.makeText(this, "已保存: " + currentFile.getName(), Toast.LENGTH_SHORT).show();
+    }
+
+    private void runCode() {
+        if (currentFile == null || codeEditor == null) return;
+
+        // 先保存
+        if (codeEditor.isDirty()) {
+            saveFile();
+        }
+
+        // 隐藏错误面板
+        if (errorPanel != null) errorPanel.setVisibility(View.GONE);
+
+        // 显示运行中状态
+        final String[] output = {""};
+        pythonRunner.execute(currentFile, new PythonRunner.RunCallback() {
+            @Override
+            public void onOutput(String out) {
+                output[0] += out;
+            }
+
+            @Override
+            public void onError(String error) {
+                runOnUiThread(() -> showError(error));
+            }
+
+            @Override
+            public void onComplete(int exitCode) {
+                runOnUiThread(() -> {
+                    if (exitCode == 0 && output[0].trim().isEmpty()) {
+                        Toast.makeText(EditorActivity.this, "执行成功（无输出）", Toast.LENGTH_SHORT).show();
+                    } else if (exitCode == 0 && !output[0].trim().isEmpty()) {
+                        Toast.makeText(EditorActivity.this,
+                                "输出:\n" + output[0].trim(), Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void showError(String errorMessage) {
+        if (errorPanel != null) errorPanel.setVisibility(View.VISIBLE);
+        if (tvErrorContent != null) {
+            String analysis = PythonRunner.analyzeError(errorMessage);
+            tvErrorContent.setText("原始错误:\n" + errorMessage + "\n\n分析:\n" + analysis);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (codeEditor != null && codeEditor.isDirty()) {
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("未保存的更改")
+                .setMessage("是否保存当前文件？")
+                .setPositiveButton("保存", (d, w) -> {
+                    saveFile();
+                    finish();
+                })
+                .setNegativeButton("不保存", (d, w) -> finish())
+                .setNeutralButton("取消", null)
+                .show();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (pythonRunner != null) pythonRunner.shutdown();
+    }
+}

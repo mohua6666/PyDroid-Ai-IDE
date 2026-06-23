@@ -1,0 +1,217 @@
+package com.example.pydroidide;
+
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pydroidide.ui.ProjectAdapter;
+import com.example.pydroidide.utils.ProjectManager;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 新版主界面 — 项目列表 + 快速入口。
+ * 作为 com.example.pydroidide 包的独立启动入口。
+ * 与 com.pydroid.app.MainActivity（ViewPager2架构）互补。
+ */
+public class MainActivity extends AppCompatActivity {
+
+    private static final int PERMISSION_REQUEST = 101;
+    private RecyclerView projectRecycler;
+    private ProjectAdapter adapter;
+    private ProjectManager projectManager;
+    private TextView emptyView;
+    private FloatingActionButton fabNewProject;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        initViews();
+        checkPermissions();
+    }
+
+    private void initViews() {
+        // 隐藏 splash layout（此Activity不使用splash）
+        View splash = findViewById(R.id.splash_layout);
+        if (splash != null) splash.setVisibility(View.GONE);
+
+        // 隐藏 ViewPager 和 BottomNav
+        View pager = findViewById(R.id.view_pager);
+        if (pager != null) pager.setVisibility(View.GONE);
+        View bottomNav = findViewById(R.id.bottom_nav);
+        if (bottomNav != null) bottomNav.setVisibility(View.GONE);
+
+        // 查找项目列表（activity_main.xml 中没有这些 ID，需要动态添加）
+        // 为了兼容现有的 activity_main.xml，我们直接动态构建界面
+        buildProjectListUI();
+    }
+
+    private void buildProjectListUI() {
+        // activity_main.xml 的根布局是 LinearLayout
+        // 但我们直接替换内容为 FrameLayout 容器
+        View content = findViewById(android.R.id.content);
+        if (!(content instanceof android.widget.FrameLayout)) return;
+
+        android.widget.FrameLayout rootFrame = (android.widget.FrameLayout) content;
+
+        // 构建项目列表容器
+        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
+        container.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+        container.setBackgroundColor(0xFF0D0D1A);
+
+        // 空状态提示
+        emptyView = new TextView(this);
+        android.widget.FrameLayout.LayoutParams emptyParams = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        emptyParams.gravity = android.view.Gravity.CENTER;
+        emptyView.setLayoutParams(emptyParams);
+        emptyView.setText("暂无项目\n点击 + 创建新项目");
+        emptyView.setTextColor(0xFF8888CC);
+        emptyView.setTextSize(16);
+        emptyView.setGravity(android.view.Gravity.CENTER);
+        emptyView.setVisibility(View.GONE);
+        container.addView(emptyView);
+
+        // RecyclerView
+        projectRecycler = new RecyclerView(this);
+        projectRecycler.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+        projectRecycler.setPadding(8, 8, 8, 8);
+        projectRecycler.setClipToPadding(false);
+        container.addView(projectRecycler);
+
+        // FAB
+        fabNewProject = new FloatingActionButton(this);
+        android.widget.FrameLayout.LayoutParams fabParams = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        fabParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
+        fabParams.setMargins(0, 0, 32, 32);
+        fabNewProject.setLayoutParams(fabParams);
+        fabNewProject.setImageResource(android.R.drawable.ic_input_add);
+        fabNewProject.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(0xFF00D4AA));
+        fabNewProject.setImageTintList(
+                android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
+        container.addView(fabNewProject);
+
+        rootFrame.addView(container);
+
+        // 初始化 ProjectManager
+        projectManager = new ProjectManager(this);
+
+        // 设置 RecyclerView
+        projectRecycler.setLayoutManager(new LinearLayoutManager(this));
+        List<File> projects = new ArrayList<>();
+        adapter = new ProjectAdapter(projects,
+                project -> {
+                    // 点击打开编辑器
+                    android.content.Intent intent = new android.content.Intent(
+                            MainActivity.this, EditorActivity.class);
+                    intent.putExtra("project_path", project.getAbsolutePath());
+                    startActivity(intent);
+                },
+                project -> {
+                    // 长按删除
+                    new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                        .setTitle("删除项目")
+                        .setMessage("确定要删除 " + project.getName() + " 吗？")
+                        .setPositiveButton("删除", (d, w) -> {
+                            projectManager.deleteProject(project);
+                            loadProjects();
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+                });
+        projectRecycler.setAdapter(adapter);
+
+        fabNewProject.setOnClickListener(v -> showNewProjectDialog());
+    }
+
+    private void checkPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                new String[]{
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                }, PERMISSION_REQUEST);
+        } else {
+            loadProjects();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            loadProjects();
+        }
+    }
+
+    private void loadProjects() {
+        if (projectManager == null || adapter == null) return;
+        List<File> projects = projectManager.getProjects();
+        adapter.updateProjects(projects);
+        if (projects.isEmpty()) {
+            emptyView.setVisibility(View.VISIBLE);
+            projectRecycler.setVisibility(View.GONE);
+        } else {
+            emptyView.setVisibility(View.GONE);
+            projectRecycler.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void showNewProjectDialog() {
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint("输入项目名称...");
+        input.setTextColor(0xFFE0E0FF);
+        input.setHintTextColor(0xFF8888CC);
+        input.setPadding(32, 32, 32, 32);
+        input.setBackgroundColor(0xFF16163A);
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("新建 Python 项目")
+            .setView(input)
+            .setPositiveButton("创建", (dialog, which) -> {
+                String name = input.getText() != null ?
+                    input.getText().toString().trim() : "";
+                if (!name.isEmpty()) {
+                    projectManager.createProject(name);
+                    loadProjects();
+                    Toast.makeText(this, "项目 " + name + " 已创建", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "请输入项目名称", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                == PackageManager.PERMISSION_GRANTED) {
+            loadProjects();
+        }
+    }
+}

@@ -1,0 +1,281 @@
+package com.pydroid.app;
+
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.TextUtils;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageButton;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import com.example.pydroidide.R;
+import com.example.pydroidide.editor.PythonSyntaxHighlighter;
+import com.example.pydroidide.python.PythonRunner;
+import com.example.pydroidide.utils.FileManager;
+import java.io.File;
+
+/**
+ * 编辑器 Fragment — 嵌入 ViewPager2 的代码编辑页。
+ * 提供代码编辑、运行、保存等核心功能。
+ */
+public class EditorFragment extends Fragment {
+
+    private CodeEditorView codeEditor;
+    private LineNumberView lineNumbers;
+    private TextView tvFilename;
+    private TextView tvErrorContent;
+    private View errorPanel;
+    private ImageButton btnRun, btnSave;
+
+    private File currentFile;
+    private FileManager fileManager;
+    private PythonRunner pythonRunner;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        View root = inflater.inflate(R.layout.activity_editor, container, false);
+
+        fileManager = new FileManager();
+        pythonRunner = new PythonRunner(requireContext());
+
+        initViews(root);
+        loadDefaultFile();
+
+        return root;
+    }
+
+    private void initViews(View root) {
+        codeEditor = root.findViewById(R.id.code_editor);
+        lineNumbers = root.findViewById(R.id.line_numbers);
+        tvFilename = root.findViewById(R.id.tv_filename);
+        tvErrorContent = root.findViewById(R.id.tv_error_content);
+        errorPanel = root.findViewById(R.id.error_panel);
+
+        btnRun = root.findViewById(R.id.btn_run);
+        btnSave = root.findViewById(R.id.btn_save);
+        ImageButton btnMenu = root.findViewById(R.id.btn_menu);
+        ImageButton btnUndo = root.findViewById(R.id.btn_undo);
+        ImageButton btnRedo = root.findViewById(R.id.btn_redo);
+
+        // 行号同步
+        if (lineNumbers != null && codeEditor != null) {
+            lineNumbers.setEditor(codeEditor);
+            codeEditor.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(android.text.Editable s) {
+                    lineNumbers.setLineCount(codeEditor.getLineCount());
+                }
+            });
+        }
+
+        // 语法高亮
+        if (codeEditor != null) {
+            codeEditor.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(android.text.Editable s) {
+                    PythonSyntaxHighlighter.highlight(codeEditor);
+                }
+            });
+        }
+
+        // 按钮事件
+        if (btnRun != null) btnRun.setOnClickListener(v -> runCode());
+        if (btnSave != null) btnSave.setOnClickListener(v -> saveFile());
+        if (btnUndo != null) btnUndo.setOnClickListener(v ->
+                Toast.makeText(getContext(), "撤销功能开发中...", Toast.LENGTH_SHORT).show());
+        if (btnRedo != null) btnRedo.setOnClickListener(v ->
+                Toast.makeText(getContext(), "重做功能开发中...", Toast.LENGTH_SHORT).show());
+        if (btnMenu != null) btnMenu.setOnClickListener(v -> showFileMenu());
+
+        // AI 建议按钮
+        View btnAiSuggest = root.findViewById(R.id.btn_ai_suggest);
+        if (btnAiSuggest != null) {
+            btnAiSuggest.setOnClickListener(v -> {
+                String code = codeEditor.getText() != null ? codeEditor.getText().toString() : "";
+                openAIAssistant("suggest", code, "");
+            });
+        }
+
+        // 修复错误按钮
+        View btnFix = root.findViewById(R.id.btn_fix_errors);
+        if (btnFix != null) {
+            btnFix.setOnClickListener(v -> {
+                String code = codeEditor.getText() != null ? codeEditor.getText().toString() : "";
+                String error = tvErrorContent != null ? tvErrorContent.getText().toString() : "";
+                openAIAssistant("fix", code, error);
+            });
+        }
+    }
+
+    private void loadDefaultFile() {
+        if (codeEditor == null) return;
+        // 使用临时 untitled.py 作为默认文件
+        File tmpDir = new File(requireContext().getCacheDir(), "editor");
+        if (!tmpDir.exists()) tmpDir.mkdirs();
+        currentFile = new File(tmpDir, "untitled.py");
+        if (!currentFile.exists()) {
+            fileManager.createDefaultMainPy(currentFile);
+        }
+
+        String content = fileManager.readFile(currentFile);
+        codeEditor.setText(content);
+        codeEditor.setDirty(false);
+        PythonSyntaxHighlighter.highlight(codeEditor);
+        if (tvFilename != null) tvFilename.setText(currentFile.getName());
+        if (lineNumbers != null) lineNumbers.setLineCount(codeEditor.getLineCount());
+    }
+
+    public void openFile(File file) {
+        if (file == null || !file.exists() || codeEditor == null) return;
+        currentFile = file;
+        String content = fileManager.readFile(file);
+        codeEditor.setText(content);
+        codeEditor.setDirty(false);
+        PythonSyntaxHighlighter.highlight(codeEditor);
+        if (tvFilename != null) tvFilename.setText(file.getName());
+        if (lineNumbers != null) lineNumbers.setLineCount(codeEditor.getLineCount());
+    }
+
+    private void saveFile() {
+        if (currentFile == null || codeEditor == null) return;
+        String content = codeEditor.getText() != null ? codeEditor.getText().toString() : "";
+        fileManager.saveFile(currentFile, content);
+        codeEditor.setDirty(false);
+        Toast.makeText(getContext(), "已保存: " + currentFile.getName(), Toast.LENGTH_SHORT).show();
+    }
+
+    private void runCode() {
+        if (currentFile == null || codeEditor == null) return;
+
+        if (codeEditor.isDirty()) saveFile();
+
+        if (errorPanel != null) errorPanel.setVisibility(View.GONE);
+
+        final StringBuilder output = new StringBuilder();
+        pythonRunner.execute(currentFile, new PythonRunner.RunCallback() {
+            @Override
+            public void onOutput(String out) {
+                output.append(out);
+            }
+
+            @Override
+            public void onError(String error) {
+                mainHandler.post(() -> showError(error));
+            }
+
+            @Override
+            public void onComplete(int exitCode) {
+                mainHandler.post(() -> {
+                    if (exitCode == 0 && output.toString().trim().isEmpty()) {
+                        Toast.makeText(getContext(), "✓ 执行成功（无输出）", Toast.LENGTH_SHORT).show();
+                    } else if (exitCode == 0) {
+                        Toast.makeText(getContext(), "输出:\n" + output.toString().trim(),
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void showError(String errorMessage) {
+        if (errorPanel != null) errorPanel.setVisibility(View.VISIBLE);
+        if (tvErrorContent != null) {
+            String analysis = PythonRunner.analyzeError(errorMessage);
+            tvErrorContent.setText("错误:\n" + errorMessage + "\n\n分析:\n" + analysis);
+        }
+    }
+
+    private void openAIAssistant(String action, String codeSnippet, String errorInfo) {
+        Intent intent = new Intent(getActivity(), AIAssistantActivity.class);
+        intent.putExtra("code_snippet", codeSnippet);
+        intent.putExtra("error_info", errorInfo);
+        intent.putExtra("action", action);
+        startActivity(intent);
+    }
+
+    private void showFileMenu() {
+        new AlertDialog.Builder(requireContext())
+            .setTitle("文件操作")
+            .setItems(new String[]{"新建", "保存", "另存为..."}, (dialog, which) -> {
+                switch (which) {
+                    case 0: // 新建
+                        if (codeEditor.isDirty()) {
+                            new AlertDialog.Builder(requireContext())
+                                .setTitle("未保存")
+                                .setMessage("是否保存当前文件？")
+                                .setPositiveButton("保存", (d, w) -> {
+                                    saveFile();
+                                    newFile();
+                                })
+                                .setNegativeButton("不保存", (d, w) -> newFile())
+                                .show();
+                        } else {
+                            newFile();
+                        }
+                        break;
+                    case 1: // 保存
+                        saveFile();
+                        break;
+                    case 2: // 另存为
+                        showSaveAsDialog();
+                        break;
+                }
+            })
+            .show();
+    }
+
+    private void newFile() {
+        if (codeEditor == null) return;
+        codeEditor.setText("");
+        codeEditor.setDirty(false);
+        currentFile = new File(requireContext().getCacheDir(), "untitled_" + System.currentTimeMillis() + ".py");
+        PythonSyntaxHighlighter.highlight(codeEditor);
+        if (tvFilename != null) tvFilename.setText(currentFile.getName());
+        if (lineNumbers != null) lineNumbers.setLineCount(1);
+        Toast.makeText(getContext(), "新文件已创建", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showSaveAsDialog() {
+        android.widget.EditText input = new android.widget.EditText(requireContext());
+        input.setHint("输入文件名（.py）...");
+        input.setText(currentFile != null ? currentFile.getName() : "untitled.py");
+        input.setPadding(32, 32, 32, 32);
+
+        new AlertDialog.Builder(requireContext())
+            .setTitle("另存为")
+            .setView(input)
+            .setPositiveButton("保存", (dialog, which) -> {
+                String name = input.getText().toString().trim();
+                if (!TextUtils.isEmpty(name)) {
+                    if (!name.endsWith(".py")) name += ".py";
+                    File parent = currentFile != null ? currentFile.getParentFile() :
+                            new File(requireContext().getCacheDir(), "editor");
+                    currentFile = new File(parent, name);
+                    saveFile();
+                    if (tvFilename != null) tvFilename.setText(currentFile.getName());
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (pythonRunner != null) pythonRunner.shutdown();
+    }
+}

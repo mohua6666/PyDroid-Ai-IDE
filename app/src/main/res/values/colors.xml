@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#0D0D1A</color>
+    <color name="bg_card">#16163A</color>
+    <color name="accent_green">#00D4AA</color>
+    <color name="accent_cyan">#00D4FF</color>
+    <color name="accent_purple">#7B68EE</color>
+    <color name="accent_pink">#FF6B9D</color>
+    <color name="text_primary">#E0E0FF</color>
+    <color name="text_secondary">#8888CC</color>
+    <color name="keyword_blue">#569CD6</color>
+    <color name="string_orange">#CE9178</color>
+    <color name="comment_green">#6A9955</color>
+    <color name="number_lightgreen">#B5CEA8</color>
+    <color name="error_red">#F44747</color>
+    <color name="warning_yellow">#CCA700</color>
+    <color name="line_number">#999999</color>
+    <color name="gutter">#1E1E3A</color>
+</resources>

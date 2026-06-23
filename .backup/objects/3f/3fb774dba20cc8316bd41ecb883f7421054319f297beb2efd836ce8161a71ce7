@@ -1,0 +1,280 @@
+package com.example.pydroidide;
+
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pydroidide.ai.ChatAdapter;
+import com.example.pydroidide.ai.ChatMessage;
+import com.google.android.material.appbar.MaterialToolbar;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * AI 助手 Activity：提供代码生成、解释、调试建议等 AI 能力。
+ * 使用 RecyclerView + ChatAdapter 实现对话式界面。
+ */
+public class AIAssistantActivity extends AppCompatActivity {
+
+    private RecyclerView chatRecycler;
+    private EditText inputEdit;
+    private ImageButton sendButton;
+    private ProgressBar loadingIndicator;
+    private MaterialToolbar toolbar;
+
+    private ChatAdapter chatAdapter;
+    private final List<ChatMessage> messages = new ArrayList<>();
+    private final ExecutorService aiExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    private String currentCode = "";
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_ai);
+
+        initViews();
+        setupToolbar();
+        setupChat();
+        loadIntentData();
+        showWelcomeMessage();
+    }
+
+    private void initViews() {
+        chatRecycler = findViewById(R.id.chatRecycler);
+        inputEdit = findViewById(R.id.aiInput);
+        sendButton = findViewById(R.id.aiSendBtn);
+        loadingIndicator = findViewById(R.id.aiLoading);
+        toolbar = findViewById(R.id.aiToolbar);
+    }
+
+    private void setupToolbar() {
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+        toolbar.setTitle("AI 编程助手");
+        toolbar.setNavigationOnClickListener(v -> finish());
+    }
+
+    private void setupChat() {
+        chatAdapter = new ChatAdapter(messages);
+        chatRecycler.setLayoutManager(new LinearLayoutManager(this));
+        chatRecycler.setAdapter(chatAdapter);
+
+        sendButton.setOnClickListener(v -> sendMessage());
+
+        inputEdit.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                sendMessage();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void loadIntentData() {
+        currentCode = getIntent().getStringExtra("current_code");
+        if (currentCode == null) currentCode = "";
+    }
+
+    private void showWelcomeMessage() {
+        StringBuilder welcome = new StringBuilder();
+        welcome.append("👋 你好！我是 PyDroid AI 编程助手。\n\n");
+        welcome.append("我可以帮你：\n");
+        welcome.append("• 🔧 生成 Python 代码\n");
+        welcome.append("• 🐛 调试错误信息\n");
+        welcome.append("• 💡 解释代码逻辑\n");
+        welcome.append("• 📝 优化代码结构\n");
+        welcome.append("• 📚 回答 Python 相关问题\n\n");
+
+        if (!currentCode.isEmpty()) {
+            welcome.append("我注意到你正在编辑以下代码：\n```python\n");
+            welcome.append(currentCode.substring(0, Math.min(300, currentCode.length())));
+            if (currentCode.length() > 300) welcome.append("\n...");
+            welcome.append("\n```\n\n");
+            welcome.append("你可以针对这段代码向我提问！");
+        } else {
+            welcome.append("请随时向我提问！");
+        }
+
+        messages.add(new ChatMessage(welcome.toString(), false));
+        chatAdapter.notifyItemInserted(messages.size() - 1);
+        chatRecycler.scrollToPosition(messages.size() - 1);
+    }
+
+    private void sendMessage() {
+        String input = inputEdit.getText().toString().trim();
+        if (input.isEmpty()) return;
+
+        // 用户消息
+        messages.add(new ChatMessage(input, true));
+        chatAdapter.notifyItemInserted(messages.size() - 1);
+        chatRecycler.scrollToPosition(messages.size() - 1);
+        inputEdit.setText("");
+
+        // 显示加载
+        setLoading(true);
+
+        // 后台生成 AI 回复
+        aiExecutor.execute(() -> {
+            String response = generateAIResponse(input);
+            mainHandler.post(() -> {
+                setLoading(false);
+                messages.add(new ChatMessage(response, false));
+                chatAdapter.notifyItemInserted(messages.size() - 1);
+                chatRecycler.scrollToPosition(messages.size() - 1);
+            });
+        });
+    }
+
+    private void setLoading(boolean loading) {
+        loadingIndicator.setVisibility(loading ? View.VISIBLE : View.GONE);
+        sendButton.setEnabled(!loading);
+        inputEdit.setEnabled(!loading);
+    }
+
+    /**
+     * 基于规则的 AI 回复生成（可替换为真正的 API 调用）。
+     */
+    private String generateAIResponse(String query) {
+        String lower = query.toLowerCase();
+
+        // 代码生成
+        if (lower.contains("生成") || lower.contains("写") || lower.contains("创建") ||
+            lower.contains("代码") || lower.contains("make") || lower.contains("create")) {
+            return generateCodeSnippet(query);
+        }
+
+        // 错误调试
+        if (lower.contains("错误") || lower.contains("error") || lower.contains("debug") ||
+            lower.contains("报错") || lower.contains("异常") || lower.contains("修复")) {
+            return debugAdvice(query);
+        }
+
+        // 解释代码
+        if (lower.contains("解释") || lower.contains("意思") || lower.contains("是什么") ||
+            lower.contains("explain") || lower.contains("什么意思")) {
+            return explainCode(query);
+        }
+
+        // Python 基础问题
+        if (lower.contains("python") || lower.contains("怎么") || lower.contains("如何") ||
+            lower.contains("how")) {
+            return pythonFAQ(query);
+        }
+
+        // 默认回复
+        return "这是一个好问题！关于「" + query.substring(0, Math.min(40, query.length())) + "…」，" +
+               "我可以从以下几个方面帮你：\n\n" +
+               "1. **代码示例**：告诉我你想实现什么功能，我帮你写代码\n" +
+               "2. **错误排查**：贴出错误信息，我帮你分析原因\n" +
+               "3. **概念解释**：告诉我你不理解的 Python 概念\n\n" +
+               "请描述得更具体一些，我会给出更准确的建议！";
+    }
+
+    private String generateCodeSnippet(String query) {
+        if (query.contains("排序") || query.contains("sort")) {
+            return "这是一个 Python 排序示例：\n\n```python\ndef quick_sort(arr):\n" +
+                   "    if len(arr) <= 1:\n        return arr\n" +
+                   "    pivot = arr[len(arr) // 2]\n" +
+                   "    left = [x for x in arr if x < pivot]\n" +
+                   "    middle = [x for x in arr if x == pivot]\n" +
+                   "    right = [x for x in arr if x > pivot]\n" +
+                   "    return quick_sort(left) + middle + quick_sort(right)\n\n" +
+                   "# 使用\narr = [3, 6, 8, 10, 1, 2, 1]\n" +
+                   "print(quick_sort(arr))\n" +
+                   "# 或直接用内置排序\nprint(sorted(arr))\n```\n\n" +
+                   "这是快速排序的实现。内置 `sorted()` 和 `list.sort()` 使用 Timsort，性能也很好。";
+        }
+        if (query.contains("文件") || query.contains("file") || query.contains("读取")) {
+            return "文件读写示例：\n\n```python\n" +
+                   "# 读取文件\nwith open('data.txt', 'r', encoding='utf-8') as f:\n" +
+                   "    content = f.read()  # 读取全部\n" +
+                   "    # lines = f.readlines()  # 按行读取\n\n" +
+                   "# 写入文件\nwith open('output.txt', 'w', encoding='utf-8') as f:\n" +
+                   "    f.write('Hello, PyDroid!')\n\n" +
+                   "# 追加\nwith open('log.txt', 'a', encoding='utf-8') as f:\n" +
+                   "    f.write('新的一行\\n')\n" +
+                   "# 推荐使用 `with` 语句，自动关闭文件\n```";
+        }
+        if (query.contains("爬虫") || query.contains("网页") || query.contains("request")) {
+            return "简单 HTTP 请求示例：\n\n```python\n" +
+                   "import urllib.request\nimport json\n\n" +
+                   "url = 'https://api.example.com/data'\n" +
+                   "try:\n" +
+                   "    with urllib.request.urlopen(url) as response:\n" +
+                   "        data = json.loads(response.read().decode())\n" +
+                   "        print(data)\n" +
+                   "except Exception as e:\n" +
+                   "    print(f'请求失败: {e}')\n```\n\n" +
+                   "注意：手机端可能需要先安装 requests 库：`pip install requests`";
+        }
+        return "根据你的需求，这里是一个代码模板：\n\n```python\n" +
+               "def main():\n    # 在这里编写你的代码\n    print('Hello!')\n\n" +
+               "if __name__ == '__main__':\n    main()\n```\n\n" +
+               "请告诉我更具体的功能需求，我可以生成更精确的代码。";
+    }
+
+    private String debugAdvice(String query) {
+        return "🔍 **调试建议**\n\n" +
+               "遇到错误时，可以按以下步骤排查：\n\n" +
+               "1. **仔细阅读错误信息**：最后一行通常指出具体错误类型和位置\n" +
+               "2. **检查语法**：Python 对缩进、冒号、括号很敏感\n" +
+               "3. **打印调试**：在可疑位置添加 `print()` 查看变量值\n" +
+               "4. **逐行检查**：注释掉部分代码，逐步定位问题行\n\n" +
+               "如果你有具体的错误信息，请贴出来，我可以帮你精确分析！";
+    }
+
+    private String explainCode(String query) {
+        if (!currentCode.isEmpty()) {
+            return "📝 针对你当前编辑的代码，我观察到一个 Python 程序。\n\n" +
+                   "如果你能指出具体不理解的部分（如某一行、某个函数），" +
+                   "我可以给你更详细的解释。\n\n" +
+                   "当前代码片段：\n```python\n" +
+                   currentCode.substring(0, Math.min(200, currentCode.length())) +
+                   "\n```";
+        }
+        return "📝 请把你想要解释的代码贴给我，我会逐行分析。";
+    }
+
+    private String pythonFAQ(String query) {
+        if (query.contains("列表") || query.contains("list")) {
+            return "Python 列表常用操作：\n\n```python\n" +
+                   "# 创建\nlst = [1, 2, 3]\nlst.append(4)      # 末尾添加\n" +
+                   "lst.insert(0, 0)   # 指定位置插入\nlst.pop()         # 移除末尾\n" +
+                   "lst.remove(2)      # 按值移除\n" +
+                   "# 列表推导式\nsquares = [x**2 for x in range(10)]\n" +
+                   "# 切片\nsubset = lst[1:3]  # 索引 1 到 2\n```";
+        }
+        if (query.contains("字典") || query.contains("dict")) {
+            return "Python 字典常用操作：\n\n```python\n" +
+                   "d = {'name': 'Alice', 'age': 25}\nd['city'] = 'Beijing'  # 添加\n" +
+                   "value = d.get('key', '默认值')  # 安全获取\n" +
+                   "for k, v in d.items():         # 遍历\n    print(f'{k}: {v}')\n" +
+                   "d.update({'age': 26})          # 更新\n```";
+        }
+        return "关于 Python 的这个问题：\n\nPython 是一门简洁、易读的编程语言。建议查阅官方文档 " +
+               "(docs.python.org/zh-cn/3/) 获取权威信息。\n\n" +
+               "你可以更具体地描述你的问题，比如：\n" +
+               "- 某个语法怎么用？\n- 为什么这段代码不工作？\n- 如何实现某个功能？";
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        aiExecutor.shutdownNow();
+    }
+}

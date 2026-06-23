@@ -1,0 +1,282 @@
+package com.example.pydroidide;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import com.example.pydroidide.editor.CodeEditor;
+import com.example.pydroidide.editor.PythonSyntaxHighlighter;
+import com.example.pydroidide.python.PythonRunner;
+import com.example.pydroidide.utils.FileManager;
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.card.MaterialCardView;
+import java.io.File;
+
+public class EditorActivity extends AppCompatActivity {
+    
+    private CodeEditor codeEditor;
+    private TextView outputView;
+    private TextView errorView;
+    private TextView lineNumbers;
+    private ScrollView outputScroll;
+    private MaterialToolbar toolbar;
+    private MaterialButton runButton, saveButton, aiButton;
+    private ChipGroup fileTabs;
+    private TabLayout bottomTabs;
+    private LinearLayout outputLayout, errorLayout;
+    private MaterialCardView outputCard, errorCard;
+    private FloatingActionButton fabRun;
+    
+    private PythonRunner pythonRunner;
+    private FileManager fileManager;
+    private File currentFile;
+    private String projectPath;
+    
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_editor);
+        
+        projectPath = getIntent().getStringExtra("project_path");
+        fileManager = new FileManager();
+        pythonRunner = new PythonRunner(this);
+        
+        initViews();
+        setupToolbar();
+        setupEditor();
+        setupBottomTabs();
+        loadDefaultFile();
+    }
+    
+    private void initViews() {
+        codeEditor = findViewById(R.id.code_editor);
+        // 复用现有布局中的元素
+        // lineNumbers 使用 LineNumberView（需要转为 TextView 用于 updateLineNumbers 的 setText）
+        // 当前布局使用 com.pydroid.app.LineNumberView，不是 TextView
+        // 改为使用代码方式处理
+        outputView = findViewById(R.id.tv_error_content); // 复用错误面板作为输出
+        errorView = findViewById(R.id.tv_error_content);
+        // lineNumbers 不再使用，改为代码动态管理
+        lineNumbers = new TextView(this);
+        outputScroll = findViewById(R.id.scroll_h);
+        toolbar = findViewById(R.id.btn_menu); // 无 MaterialToolbar，用按钮代替
+        runButton = findViewById(R.id.btn_run);
+        saveButton = findViewById(R.id.btn_save);
+        aiButton = findViewById(R.id.btn_ai_suggest);
+        // fileTabs, bottomTabs 等不存在，做空保护
+        fabRun = findViewById(R.id.btn_terminal);
+    }
+    
+    private void setupToolbar() {
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+        toolbar.setTitle("编辑器");
+        toolbar.setNavigationOnClickListener(v -> finish());
+    }
+    
+    private void setupEditor() {
+        codeEditor.setTabWidth(4);
+        
+        codeEditor.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateLineNumbers();
+                if (currentFile != null) {
+                    toolbar.setTitle(currentFile.getName() + (codeEditor.isDirty() ? " ●" : ""));
+                }
+            }
+            
+            @Override
+            public void afterTextChanged(Editable s) {
+                PythonSyntaxHighlighter.highlight(codeEditor);
+            }
+        });
+        
+        saveButton.setOnClickListener(v -> saveFile());
+        runButton.setOnClickListener(v -> runPythonCode());
+        aiButton.setOnClickListener(v -> openAIAssistant());
+        fabRun.setOnClickListener(v -> runPythonCode());
+        
+        findViewById(R.id.clearOutputBtn).setOnClickListener(v -> outputView.setText(""));
+        findViewById(R.id.clearErrorBtn).setOnClickListener(v -> errorView.setText(""));
+    }
+    
+    private void setupBottomTabs() {
+        bottomTabs.addTab(bottomTabs.newTab().setText("输出"));
+        bottomTabs.addTab(bottomTabs.newTab().setText("错误"));
+        bottomTabs.addTab(bottomTabs.newTab().setText("文件"));
+        
+        bottomTabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                int pos = tab.getPosition();
+                outputCard.setVisibility(pos == 0 ? View.VISIBLE : View.GONE);
+                errorCard.setVisibility(pos == 1 ? View.VISIBLE : View.GONE);
+            }
+            
+            @Override
+            public void onTabUnselected(TabLayout.Tab tab) {}
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) {}
+        });
+    }
+    
+    private void loadDefaultFile() {
+        File projectDir = new File(projectPath);
+        if (projectDir.exists() && projectDir.isDirectory()) {
+            File mainPy = new File(projectDir, "main.py");
+            if (!mainPy.exists()) {
+                fileManager.createDefaultMainPy(mainPy);
+            }
+            openFile(mainPy);
+            refreshFileTabs(projectDir);
+        }
+    }
+    
+    private void openFile(File file) {
+        currentFile = file;
+        String content = fileManager.readFile(file);
+        codeEditor.setText(content);
+        codeEditor.setDirty(false);
+        toolbar.setTitle(file.getName());
+        updateLineNumbers();
+        PythonSyntaxHighlighter.highlight(codeEditor);
+    }
+    
+    private void saveFile() {
+        if (currentFile != null && codeEditor.isDirty()) {
+            fileManager.saveFile(currentFile, codeEditor.getText().toString());
+            codeEditor.setDirty(false);
+            toolbar.setTitle(currentFile.getName());
+            Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void refreshFileTabs(File projectDir) {
+        fileTabs.removeAllViews();
+        File[] files = projectDir.listFiles((d, name) -> name.endsWith(".py"));
+        if (files == null) return;
+        
+        for (File f : files) {
+            Chip chip = new Chip(this);
+            chip.setText(f.getName());
+            chip.setCheckable(true);
+            chip.setChecked(f.equals(currentFile));
+            chip.setOnClickListener(v -> openFile(f));
+            fileTabs.addView(chip);
+        }
+        
+        Chip addChip = new Chip(this);
+        addChip.setText("+ 新建");
+        addChip.setChipIconResource(android.R.drawable.ic_input_add);
+        addChip.setOnClickListener(v -> showNewFileDialog());
+        fileTabs.addView(addChip);
+    }
+    
+    private void showNewFileDialog() {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_new_project, null);
+        TextInputEditText nameInput = dialogView.findViewById(R.id.projectNameInput);
+        nameInput.setHint("文件名.py");
+        
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("新建 Python 文件")
+            .setView(dialogView)
+            .setPositiveButton("创建", (dialog, which) -> {
+                String name = nameInput.getText() != null ?
+                    nameInput.getText().toString().trim() : "";
+                if (!name.isEmpty()) {
+                    if (!name.endsWith(".py")) name += ".py";
+                    File newFile = new File(projectPath, name);
+                    fileManager.createDefaultMainPy(newFile);
+                    openFile(newFile);
+                    refreshFileTabs(new File(projectPath));
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+    
+    private void runPythonCode() {
+        if (currentFile == null) return;
+        saveFile();
+        
+        bottomTabs.selectTab(bottomTabs.getTabAt(0));
+        outputView.setText(">>> 运行中...\n");
+        errorView.setText("");
+        
+        pythonRunner.execute(currentFile, new PythonRunner.RunCallback() {
+            @Override
+            public void onOutput(String output) {
+                runOnUiThread(() -> outputView.append(output));
+            }
+            
+            @Override
+            public void onError(String error) {
+                runOnUiThread(() -> {
+                    errorView.setText(error);
+                    bottomTabs.selectTab(bottomTabs.getTabAt(1));
+                    
+                    String smartMsg = PythonRunner.analyzeError(error);
+                    errorView.append("\n\n【智能分析】\n" + smartMsg);
+                });
+            }
+            
+            @Override
+            public void onComplete(int exitCode) {
+                runOnUiThread(() -> {
+                    outputView.append("\n\n--- 执行完成 (exit: " + exitCode + ") ---");
+                });
+            }
+        });
+    }
+    
+    private void openAIAssistant() {
+        Intent intent = new Intent(this, AIAssistantActivity.class);
+        if (codeEditor.getText() != null && codeEditor.getText().length() > 0) {
+            intent.putExtra("current_code", 
+                codeEditor.getText().toString().substring(0, 
+                    Math.min(500, codeEditor.getText().length())));
+        }
+        startActivityForResult(intent, 100);
+    }
+    
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 100 && resultCode == RESULT_OK && data != null) {
+            String aiCode = data.getStringExtra("ai_code");
+            if (aiCode != null && !aiCode.isEmpty()) {
+                codeEditor.getText().insert(codeEditor.getSelectionStart(), aiCode);
+            }
+        }
+    }
+    
+    private void updateLineNumbers() {
+        int lines = codeEditor.getLineCount();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i <= lines; i++) {
+            sb.append(i).append("\n");
+        }
+        lineNumbers.setText(sb.toString());
+    }
+}

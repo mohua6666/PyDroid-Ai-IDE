@@ -1,0 +1,121 @@
+package com.example.pydroidide.editor;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.AttributeSet;
+import android.util.TypedValue;
+import androidx.appcompat.widget.AppCompatEditText;
+
+/**
+ * 代码编辑器 — EditText 子类，支持 Tab 缩进、脏标记跟踪。
+ * 语法高亮由 PythonSyntaxHighlighter 完成。
+ */
+public class CodeEditor extends AppCompatEditText {
+
+    private int tabWidth = 4;          // Tab 替换为几个空格
+    private boolean dirty = false;     // 内容是否已修改（未保存）
+    private Paint gutterPaint;
+
+    public CodeEditor(Context context) {
+        super(context);
+        init();
+    }
+
+    public CodeEditor(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+
+    public CodeEditor(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init();
+    }
+
+    private void init() {
+        setHorizontallyScrolling(true);
+        setTypeface(android.graphics.Typeface.MONOSPACE);
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        setTextColor(0xFFE0E0FF);
+
+        addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                dirty = true;
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+    }
+
+    /**
+     * 处理 Tab 键 — 插入空格而非制表符。
+     */
+    @Override
+    public boolean onKeyPreIme(int keyCode, android.view.KeyEvent event) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_TAB && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < tabWidth; i++) sb.append(' ');
+            getText().insert(getSelectionStart(), sb.toString());
+            return true;
+        }
+        return super.onKeyPreIme(keyCode, event);
+    }
+
+    @Override
+    protected void onTextChanged(CharSequence text, int start, int lengthBefore, int lengthAfter) {
+        super.onTextChanged(text, start, lengthBefore, lengthAfter);
+
+        // 自动缩进：回车后保持上一行的缩进
+        if (lengthAfter == 1 && start > 0 && text.charAt(start) == '\n') {
+            Editable editable = getText();
+            if (editable == null) return;
+            int prevLineStart = start - 1;
+            while (prevLineStart > 0 && editable.charAt(prevLineStart - 1) != '\n') {
+                prevLineStart--;
+            }
+            StringBuilder indent = new StringBuilder();
+            while (prevLineStart < start &&
+                   (editable.charAt(prevLineStart) == ' ' || editable.charAt(prevLineStart) == '\t')) {
+                indent.append(' ');
+                prevLineStart++;
+            }
+            if (indent.length() > 0) {
+                editable.insert(start + 1, indent.toString());
+            }
+        }
+    }
+
+    // ---- 公开方法 ----
+
+    public void setTabWidth(int width) {
+        this.tabWidth = width;
+    }
+
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    public void setDirty(boolean dirty) {
+        this.dirty = dirty;
+    }
+
+    /**
+     * 返回当前文本的行数（用于行号联动）。
+     */
+    public int getLineCount() {
+        Editable e = getText();
+        if (e == null || e.length() == 0) return 1;
+        int count = 1;
+        for (int i = 0; i < e.length(); i++) {
+            if (e.charAt(i) == '\n') count++;
+        }
+        return count;
+    }
+}

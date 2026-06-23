@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark">
+
+    <!-- 顶部工具栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:background="@color/bg_card"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:elevation="4dp">
+
+        <ImageButton
+            android:id="@+id/btn_menu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="?android:attr/actionModeCloseDrawable"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="菜单" />
+
+        <TextView
+            android:id="@+id/tv_filename"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="untitled.py"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:layout_marginStart="8dp" />
+
+        <ImageButton
+            android:id="@+id/btn_undo"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="?android:attr/actionModeUndoDrawable"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="撤销" />
+
+        <ImageButton
+            android:id="@+id/btn_redo"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="?android:attr/actionModeRedoDrawable"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="重做" />
+
+        <ImageButton
+            android:id="@+id/btn_run"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="?android:attr/actionModePlayDrawable"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="运行" />
+
+        <ImageButton
+            android:id="@+id/btn_save"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="?android:attr/actionModeSaveDrawable"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="保存" />
+    </LinearLayout>
+
+    <!-- 带行号的编辑器容器 -->
+    <HorizontalScrollView
+        android:id="@+id/scroll_h"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <!-- 行号区域 -->
+            <com.pydroid.app.LineNumberView
+                android:id="@+id/line_numbers"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:background="@color/gutter" />
+
+            <!-- 代码编辑区 -->
+            <com.pydroid.app.CodeEditorView
+                android:id="@+id/code_editor"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:minWidth="600dp"
+                android:background="@color/bg_dark"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:typeface="monospace"
+                android:gravity="top|start"
+                android:padding="8dp"
+                android:scrollbars="vertical"
+                android:isScrollContainer="true"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:text="print('Hello, PyDroid AI!')\n\n# 欢迎使用 PyDroid AI\n# 开始编写你的Python代码...\n" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- 底部操作栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:background="@color/bg_card"
+        android:gravity="center"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:elevation="8dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_ai_suggest"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_margin="4dp"
+            android:text="✨ AI建议"
+            android:textColor="#FFFFFF"
+            app:cornerRadius="20dp"
+            app:backgroundTint="@color/accent_purple"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_fix_errors"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_margin="4dp"
+            android:text="🔧 修复错误"
+            android:textColor="#FFFFFF"
+            app:cornerRadius="20dp"
+            app:backgroundTint="@color/error_red"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_terminal"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_margin="4dp"
+            android:text="▶ 终端"
+            android:textColor="#FFFFFF"
+            app:cornerRadius="20dp"
+            app:backgroundTint="@color/accent_green"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+    </LinearLayout>
+
+    <!-- 错误面板(可展开) -->
+    <LinearLayout
+        android:id="@+id/error_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/bg_card"
+        android:visibility="gone"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tv_error_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚠️ 错误信息"
+            android:textColor="@color/error_red"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_marginTop="4dp">
+            <TextView
+                android:id="@+id/tv_error_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:text="" />
+        </ScrollView>
+    </LinearLayout>
+</LinearLayout>

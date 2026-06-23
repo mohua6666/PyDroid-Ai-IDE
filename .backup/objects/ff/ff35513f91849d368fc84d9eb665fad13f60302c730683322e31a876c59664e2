@@ -1,0 +1,92 @@
+package com.example.application;
+
+import android.os.Bundle;
+import android.os.Handler;
+import android.view.View;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.viewpager2.widget.ViewPager2;
+import com.example.pydroidide.R;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.pydroid.app.AIAssistantFragment;
+import com.pydroid.app.FileManagerFragment;
+import com.pydroid.app.TerminalFragment;
+import com.pydroid.app.ViewPagerAdapter;
+
+/**
+ * PyDroid AI 主 Activity。
+ * 启动时显示 Splash 画面，随后切换到 ViewPager2 + BottomNavigationView 的多标签界面。
+ */
+public class MainActivity extends AppCompatActivity {
+
+    private View splashLayout;
+    private ViewPager2 viewPager;
+    private BottomNavigationView bottomNav;
+    private ProgressBar progressBar;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        splashLayout = findViewById(R.id.splash_layout);
+        viewPager = findViewById(R.id.view_pager);
+        bottomNav = findViewById(R.id.bottom_nav);
+        progressBar = findViewById(R.id.progress_bar);
+
+        setupViewPager();
+        setupBottomNav();
+
+        // Splash 延迟后进入主界面
+        new Handler().postDelayed(this::showMain, 1500);
+    }
+
+    private void setupViewPager() {
+        ViewPagerAdapter adapter = new ViewPagerAdapter(this);
+        adapter.addFragment(new AIAssistantFragment(), "AI助手");
+        adapter.addFragment(new TerminalFragment(), "终端");
+        adapter.addFragment(new FileManagerFragment(), "文件");
+
+        viewPager.setAdapter(adapter);
+        viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                bottomNav.getMenu().getItem(position).setChecked(true);
+            }
+        });
+    }
+
+    private void setupBottomNav() {
+        bottomNav.setOnNavigationItemSelectedListener(item -> {
+            int id = item.getItemId();
+            if (id == R.id.nav_ai) {
+                viewPager.setCurrentItem(0, true);
+                return true;
+            } else if (id == R.id.nav_terminal) {
+                viewPager.setCurrentItem(1, true);
+                return true;
+            } else if (id == R.id.nav_files) {
+                viewPager.setCurrentItem(2, true);
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void showMain() {
+        if (splashLayout != null) splashLayout.setVisibility(View.GONE);
+        if (progressBar != null) progressBar.setVisibility(View.GONE);
+        if (viewPager != null) viewPager.setVisibility(View.VISIBLE);
+        if (bottomNav != null) bottomNav.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (viewPager.getCurrentItem() != 0) {
+            viewPager.setCurrentItem(0, true);
+        } else {
+            super.onBackPressed();
+        }
+    }
+}

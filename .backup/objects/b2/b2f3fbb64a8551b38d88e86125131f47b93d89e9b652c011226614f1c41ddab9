@@ -1,0 +1,223 @@
+package com.pydroid.app;
+
+import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.TextUtils;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import com.example.pydroidide.R;
+import com.example.pydroidide.python.PythonRunner;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+
+/**
+ * 终端 Fragment — Python 交互式命令行执行器。
+ * 利用 Runtime.exec() 调用 python3 实现 REPL 风格的交互。
+ */
+public class TerminalFragment extends Fragment {
+
+    private TextView outputText;
+    private EditText commandEdit;
+    private ImageButton execButton;
+    private ImageButton clearButton;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final StringBuilder outputBuffer = new StringBuilder();
+    private File currentDir;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        View root = inflater.inflate(R.layout.activity_terminal, container, false);
+
+        outputText = root.findViewById(R.id.tv_output);
+        commandEdit = root.findViewById(R.id.et_command);
+        execButton = root.findViewById(R.id.btn_exec);
+        clearButton = root.findViewById(R.id.btn_clear_term);
+
+        currentDir = new File(Environment.getExternalStorageDirectory(), "PyDroidProjects");
+
+        // 初始欢迎信息
+        appendOutput("Python 3.x (PyDroid AI Runtime)\n" +
+                ">>> 就绪。输入 Python 命令或表达式...\n" +
+                ">>> 提示: 输入 :help 查看帮助\n\n");
+
+        execButton.setOnClickListener(v -> executeCommand());
+        commandEdit.setOnEditorActionListener((v, actionId, event) -> {
+            executeCommand();
+            return true;
+        });
+
+        clearButton.setOnClickListener(v -> {
+            outputBuffer.setLength(0);
+            outputText.setText("");
+            appendOutput(">>> 终端已清屏\n\n");
+        });
+
+        return root;
+    }
+
+    private void executeCommand() {
+        String cmd = commandEdit.getText().toString().trim();
+        if (TextUtils.isEmpty(cmd)) return;
+
+        appendOutput(">>> " + cmd + "\n");
+        commandEdit.setText("");
+
+        // 处理特殊命令
+        if (cmd.startsWith(":")) {
+            handleMetaCommand(cmd);
+            return;
+        }
+
+        // 将命令写入临时文件并执行
+        new Thread(() -> {
+            try {
+                // 写临时脚本
+                File tmpDir = new File(requireContext().getCacheDir(), "pyscripts");
+                if (!tmpDir.exists()) tmpDir.mkdirs();
+                File script = new File(tmpDir, "_term_exec.py");
+                // 包装成 try-except 以便捕获错误
+                String wrapped = "try:\n" +
+                        "    " + cmd.replace("\n", "\n    ") + "\n" +
+                        "except Exception as __e:\n" +
+                        "    print(f'Error: {type(__e).__name__}: {__e}')\n";
+                java.io.FileOutputStream fos = new java.io.FileOutputStream(script);
+                fos.write(wrapped.getBytes("UTF-8"));
+                fos.close();
+
+                ProcessBuilder pb = new ProcessBuilder("python3", script.getAbsolutePath());
+                pb.directory(currentDir);
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        String finalLine = line;
+                        mainHandler.post(() -> appendOutput(finalLine + "\n"));
+                    }
+                }
+
+                int exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    mainHandler.post(() -> appendOutput("[退出码: " + exitCode + "]\n"));
+                }
+                // 清理临时文件
+                script.delete();
+
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    appendOutput("执行异常: " + e.getMessage() + "\n");
+                    appendOutput("提示: 请确认设备已安装 Python3 (Termux 或类似环境)\n");
+                });
+            }
+        }).start();
+    }
+
+    private void handleMetaCommand(String cmd) {
+        switch (cmd) {
+            case ":help":
+                appendOutput("PyDroid AI 终端帮助\n" +
+                        "──────────────────────\n" +
+                        "  :help    - 显示此帮助\n" +
+                        "  :clear   - 清屏\n" +
+                        "  :pwd     - 显示当前工作目录\n" +
+                        "  :version - 显示版本信息\n" +
+                        "  :dir     - 列出当前目录文件\n" +
+                        "  :cd xxx  - 切换工作目录\n" +
+                        "  :run xxx - 运行 .py 文件\n" +
+                        "\n");
+                break;
+            case ":clear":
+                outputBuffer.setLength(0);
+                outputText.setText("");
+                appendOutput(">>> 终端已清屏\n\n");
+                break;
+            case ":pwd":
+                appendOutput(currentDir.getAbsolutePath() + "\n\n");
+                break;
+            case ":version":
+                appendOutput("PyDroid AI v1.0 | Python 3.x Runtime\n\n");
+                break;
+            case ":dir":
+                File[] files = currentDir.listFiles();
+                if (files != null) {
+                    StringBuilder sb = new StringBuilder();
+                    for (File f : files) {
+                        String type = f.isDirectory() ? "/" : "";
+                        sb.append(String.format("  %-30s %10d bytes\n",
+                                f.getName() + type, f.length()));
+                    }
+                    appendOutput(sb.toString() + "\n");
+                } else {
+                    appendOutput("(空目录)\n\n");
+                }
+                break;
+            default:
+                if (cmd.startsWith(":cd ")) {
+                    String target = cmd.substring(4).trim();
+                    File newDir = new File(currentDir, target);
+                    if (newDir.exists() && newDir.isDirectory()) {
+                        currentDir = newDir;
+                        appendOutput("已切换到: " + currentDir.getAbsolutePath() + "\n\n");
+                    } else {
+                        appendOutput("目录不存在: " + target + "\n\n");
+                    }
+                } else if (cmd.startsWith(":run ")) {
+                    String scriptName = cmd.substring(5).trim();
+                    File script = new File(currentDir, scriptName);
+                    if (script.exists()) {
+                        appendOutput("运行脚本: " + script.getAbsolutePath() + "\n");
+                        commandEdit.setText(cmd); // 复用命令执行逻辑需要特殊处理
+                        // 直接执行脚本
+                        new PythonRunner(requireContext()).execute(script,
+                                new PythonRunner.RunCallback() {
+                                    @Override
+                                    public void onOutput(String output) {
+                                        mainHandler.post(() -> appendOutput(output));
+                                    }
+                                    @Override
+                                    public void onError(String error) {
+                                        mainHandler.post(() -> appendOutput("错误: " + error + "\n"));
+                                    }
+                                    @Override
+                                    public void onComplete(int exitCode) {
+                                        mainHandler.post(() ->
+                                                appendOutput("\n[完成, 退出码: " + exitCode + "]\n\n"));
+                                    }
+                                });
+                    } else {
+                        appendOutput("文件不存在: " + scriptName + "\n\n");
+                    }
+                } else {
+                    appendOutput("未知命令: " + cmd + " (输入 :help 获取帮助)\n\n");
+                }
+                break;
+        }
+    }
+
+    private void appendOutput(String text) {
+        outputBuffer.append(text);
+        outputText.setText(outputBuffer.toString());
+        // 自动滚动到底部
+        outputText.post(() -> {
+            View parent = (View) outputText.getParent();
+            if (parent instanceof android.widget.ScrollView) {
+                ((android.widget.ScrollView) parent).fullScroll(View.FOCUS_DOWN);
+            }
+        });
+    }
+}

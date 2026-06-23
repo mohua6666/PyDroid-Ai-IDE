@@ -1,0 +1,161 @@
+package com.pydroid.app;
+
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.TextUtils;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pydroidide.R;
+import com.example.pydroidide.ai.ChatAdapter;
+import com.example.pydroidide.ai.ChatMessage;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * AI 助手 Fragment — 内置简单 AI 对话（可接入云端 API）。
+ */
+public class AIAssistantFragment extends Fragment {
+
+    private RecyclerView chatRecyclerView;
+    private EditText inputEditText;
+    private ImageButton sendButton;
+    private ImageButton clearButton;
+
+    private final List<ChatMessage> messages = new ArrayList<>();
+    private ChatAdapter adapter;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        View root = inflater.inflate(R.layout.activity_ai, container, false);
+
+        chatRecyclerView = root.findViewById(R.id.rv_chat);
+        inputEditText = root.findViewById(R.id.et_ai_input);
+        sendButton = root.findViewById(R.id.btn_send);
+        clearButton = root.findViewById(R.id.btn_clear_chat);
+
+        if (chatRecyclerView == null) return root;
+
+        // 设置 RecyclerView
+        adapter = new ChatAdapter(messages);
+        chatRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        chatRecyclerView.setAdapter(adapter);
+
+        // 初始欢迎消息
+        if (messages.isEmpty()) {
+            messages.add(new ChatMessage(
+                "👋 你好！我是 PyDroid AI 助手。\n\n我可以帮你：\n" +
+                "• 📖 解释 Python 代码\n" +
+                "• ⚡ 优化你的脚本\n" +
+                "• 🐛 分析错误和调试\n" +
+                "• ✨ 生成 Python 代码\n\n" +
+                "请描述你的需求吧！", false));
+            adapter.notifyItemInserted(0);
+        }
+
+        // 发送按钮
+        if (sendButton != null) sendButton.setOnClickListener(v -> sendMessage());
+
+        if (clearButton != null) clearButton.setOnClickListener(v -> {
+            messages.clear();
+            adapter.notifyDataSetChanged();
+            messages.add(new ChatMessage(
+                "对话已清空。有什么我可以帮你的？", false));
+            adapter.notifyItemInserted(0);
+        });
+
+        // 快捷 Chip（需要从布局中查找）
+        setupQuickChips(root);
+
+        return root;
+    }
+
+    private void sendMessage() {
+        if (inputEditText == null) return;
+        String text = inputEditText.getText().toString().trim();
+        if (TextUtils.isEmpty(text)) return;
+
+        // 添加用户消息
+        messages.add(new ChatMessage(text, true));
+        adapter.notifyItemInserted(messages.size() - 1);
+        chatRecyclerView.smoothScrollToPosition(messages.size() - 1);
+        inputEditText.setText("");
+
+        // 模拟 AI 回复（实际应接入云端 API）
+        mainHandler.postDelayed(() -> {
+            String reply = generateSimpleReply(text);
+            messages.add(new ChatMessage(reply, false));
+            adapter.notifyItemInserted(messages.size() - 1);
+            chatRecyclerView.smoothScrollToPosition(messages.size() - 1);
+        }, 600);
+    }
+
+    /**
+     * 简单的关键词匹配回复（占位实现，实际应接入真实 LLM API）。
+     */
+    private String generateSimpleReply(String input) {
+        String lower = input.toLowerCase();
+
+        if (lower.contains("错误") || lower.contains("error") || lower.contains("报错")) {
+            return "🔍 关于错误排查，请提供完整的错误信息，我可以帮你分析。\n\n" +
+                   "常见 Python 错误及解决方案：\n" +
+                   "• `SyntaxError` — 检查冒号、括号匹配\n" +
+                   "• `NameError` — 检查变量名是否正确\n" +
+                   "• `TypeError` — 检查操作是否支持该类型";
+        }
+        if (lower.contains("print") || lower.contains("输出")) {
+            return "`print()` 是 Python 中最基础的输出函数。\n\n```python\nprint('Hello World')\nprint(f'变量值: {value}')\n```\n\n使用 f-string 可以方便地格式化输出。";
+        }
+        if (lower.contains("for") || lower.contains("循环")) {
+            return "Python 的 for 循环非常灵活：\n\n```python\n# 遍历列表\nfor item in my_list:\n    print(item)\n\n# 使用 range\nfor i in range(10):\n    print(i)\n\n# 遍历字典\nfor key, value in my_dict.items():\n    print(key, value)\n```";
+        }
+        if (lower.contains("函数") || lower.contains("def")) {
+            return "定义函数使用 `def` 关键字：\n\n```python\ndef greet(name):\n    \"\"\"向指定的人问好\"\"\"\n    return f'Hello, {name}!'\n\nresult = greet('Python')\nprint(result)  # Hello, Python!\n```";
+        }
+        if (lower.contains("列表") || lower.contains("list")) {
+            return "Python 列表常用操作：\n\n```python\n# 创建列表\nfruits = ['apple', 'banana', 'orange']\n\n# 列表推导式\nsquares = [x**2 for x in range(10)]\n\n# 排序\nfruits.sort()\n```";
+        }
+        if (lower.contains("你好") || lower.contains("hello") || lower.contains("hi")) {
+            return "你好！有什么 Python 相关的问题我可以帮你解答？";
+        }
+
+        return "感谢你的提问！这个问题建议查阅 Python 官方文档或提供更多上下文，我来帮你更准确地分析。";
+    }
+
+    private void setupQuickChips(View root) {
+        View chipExplain = root.findViewById(R.id.chip_explain);
+        View chipOptimize = root.findViewById(R.id.chip_optimize);
+        View chipDebug = root.findViewById(R.id.chip_debug);
+        View chipGenerate = root.findViewById(R.id.chip_generate);
+        View chipConvert = root.findViewById(R.id.chip_convert);
+
+        if (chipExplain != null) chipExplain.setOnClickListener(v -> quickAsk("请解释以下 Python 代码的含义和工作原理："));
+        if (chipOptimize != null) chipOptimize.setOnClickListener(v -> quickAsk("请优化以下 Python 代码，使其更高效："));
+        if (chipDebug != null) chipDebug.setOnClickListener(v -> quickAsk("请帮我分析以下代码中的错误："));
+        if (chipGenerate != null) chipGenerate.setOnClickListener(v -> quickAsk("请帮我生成一个 Python 脚本，实现以下功能："));
+        if (chipConvert != null) chipConvert.setOnClickListener(v -> quickAsk("请把以下代码转换为 Python："));
+    }
+
+    private void quickAsk(String prefix) {
+        if (inputEditText == null) return;
+        String current = inputEditText.getText().toString().trim();
+        if (!TextUtils.isEmpty(current)) {
+            inputEditText.setText(prefix + "\n" + current);
+        } else {
+            inputEditText.setText(prefix + "\n");
+        }
+        inputEditText.setSelection(inputEditText.getText().length());
+    }
+}

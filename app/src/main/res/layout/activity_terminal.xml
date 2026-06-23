@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:background="@color/bg_card"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:elevation="4dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="💻 Python终端"
+            android:textColor="@color/accent_green"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btn_clear_term"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="?android:attr/ic_menu_delete"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <ScrollView
+            android:id="@+id/scroll_output"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="#000510"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/tv_output"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#00FF88"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:text="Python 3.11 (PyDroid AI Runtime)\n>>> 就绪，等待输入...\n" />
+        </ScrollView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@color/bg_card"
+            android:padding="8dp"
+            android:gravity="center_vertical">
+
+            <EditText
+                android:id="@+id/et_command"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="输入Python命令..."
+                android:textColorHint="#666"
+                android:textColor="@color/accent_green"
+                android:textSize="14sp"
+                android:background="@drawable/edit_bg"
+                android:padding="10dp"
+                android:fontFamily="monospace"
+                android:inputType="textNoSuggestions" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_exec"
+                android:layout_width="48dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:text="▶"
+                android:textColor="#FFF"
+                app:cornerRadius="20dp"
+                app:backgroundTint="@color/accent_green"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

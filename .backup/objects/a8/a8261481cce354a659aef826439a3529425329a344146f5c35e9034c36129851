@@ -1,0 +1,92 @@
+package com.example.pydroidide.ai;
+
+import android.graphics.Color;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.TypefaceSpan;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pydroidide.R;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * 聊天消息 RecyclerView 适配器。
+ * 支持用户消息（右对齐、蓝色背景）和 AI 消息（左对齐、卡片背景），
+ * 并对代码块（```...```）做简单的 Markdown 风格着色。
+ */
+public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHolder> {
+
+    private final List<ChatMessage> messages;
+    private static final Pattern CODE_BLOCK = Pattern.compile("```(\\w*)\\n([\\s\\S]*?)```");
+
+    public ChatAdapter(List<ChatMessage> messages) {
+        this.messages = messages;
+    }
+
+    @NonNull
+    @Override
+    public MessageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext())
+            .inflate(R.layout.item_chat_message, parent, false);
+        return new MessageViewHolder(view);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
+        ChatMessage msg = messages.get(position);
+        holder.bind(msg);
+    }
+
+    @Override
+    public int getItemCount() {
+        return messages.size();
+    }
+
+    static class MessageViewHolder extends RecyclerView.ViewHolder {
+        private final TextView contentText;
+        private final View userBubble, aiBubble;
+
+        MessageViewHolder(View itemView) {
+            super(itemView);
+            contentText = itemView.findViewById(R.id.messageContent);
+            userBubble = itemView.findViewById(R.id.userBubble);
+            aiBubble = itemView.findViewById(R.id.aiBubble);
+        }
+
+        void bind(ChatMessage msg) {
+            if (msg.isUser()) {
+                userBubble.setVisibility(View.VISIBLE);
+                aiBubble.setVisibility(View.GONE);
+            } else {
+                userBubble.setVisibility(View.GONE);
+                aiBubble.setVisibility(View.VISIBLE);
+            }
+            contentText.setText(formatContent(msg.getContent()));
+        }
+
+        /**
+         * 简单的 Markdown 风格处理：代码块着色。
+         */
+        private CharSequence formatContent(String raw) {
+            SpannableString spannable = new SpannableString(raw);
+
+            Matcher m = CODE_BLOCK.matcher(raw);
+            while (m.find()) {
+                int color = Color.rgb(86, 156, 214);  // 蓝色
+                spannable.setSpan(
+                    new ForegroundColorSpan(color),
+                    m.start(), m.end(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                );
+            }
+            return spannable;
+        }
+    }
+}
