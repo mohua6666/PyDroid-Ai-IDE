@@ -39,7 +39,7 @@
             android:id="@+id/btn_undo"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="?android:attr/actionModeUndoDrawable"
+            android:src="@android:drawable/ic_menu_revert"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="撤销" />
 
@@ -47,7 +47,7 @@
             android:id="@+id/btn_redo"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="?android:attr/actionModeRedoDrawable"
+            android:src="@android:drawable/ic_menu_rotate"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="重做" />
 
@@ -55,7 +55,7 @@
             android:id="@+id/btn_run"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="?android:attr/actionModePlayDrawable"
+            android:src="@android:drawable/ic_media_play"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="运行" />
 
@@ -63,7 +63,7 @@
             android:id="@+id/btn_save"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="?android:attr/actionModeSaveDrawable"
+            android:src="@android:drawable/ic_menu_save"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="保存" />
     </LinearLayout>

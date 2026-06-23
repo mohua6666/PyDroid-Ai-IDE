@@ -29,7 +29,7 @@
             android:id="@+id/btn_clear_term"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="?android:attr/ic_menu_delete"
+            android:src="@android:drawable/ic_menu_delete"
             android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
 

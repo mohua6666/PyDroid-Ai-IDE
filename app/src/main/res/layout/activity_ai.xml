@@ -30,7 +30,7 @@
             android:id="@+id/btn_clear_chat"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="?android:attr/ic_menu_delete"
+            android:src="@android:drawable/ic_menu_delete"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="清空对话" />
     </LinearLayout>
@@ -157,7 +157,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginStart="8dp"
-            android:src="?android:attr/actionModeSendDrawable"
+            android:src="@android:drawable/ic_menu_send"
             android:background="@drawable/send_btn_bg"
             android:contentDescription="发送" />
     </LinearLayout>
