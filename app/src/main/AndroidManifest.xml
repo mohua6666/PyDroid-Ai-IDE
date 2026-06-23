@@ -67,7 +67,7 @@
             android:name="com.example.application.GlobalApplication$CrashActivity"
             android:exported="false"
             android:process=":crash_report"
-            android:theme="@android:style/Theme_DeviceDefault" />
+            android:theme="@style/AppTheme" />
             
     </application>
 </manifest>
